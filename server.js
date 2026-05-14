@@ -12,9 +12,15 @@ const accountsRouter = require('./accountsRouter');
 const app = express();
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
+// Handle OPTIONS preflight requests for all routes
+app.options('*', cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
+    credentials: true,
+}));
+
 app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
-    credentials: true, // Required for cookies (refreshToken)
+    credentials: true, // Required for httpOnly refreshToken cookie
 }));
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
@@ -23,6 +29,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ─── Swagger Setup ─────────────────────────────────────────────────────────────
+// APP_URL env var is set on Render to the public backend URL
+const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 4000}`;
+
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
@@ -33,9 +42,7 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: process.env.NODE_ENV === 'production'
-                    ? 'https://YOUR-BACKEND-URL.onrender.com'
-                    : `http://localhost:${process.env.PORT || 4000}`,
+                url: appUrl,
                 description: process.env.NODE_ENV === 'production' ? 'Production' : 'Local Development',
             },
         ],
@@ -49,7 +56,7 @@ const swaggerOptions = {
             },
         },
     },
-    apis: ['./accountsRouter.js'], // Scan this file for JSDoc @swagger tags
+    apis: ['./accountsRouter.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
