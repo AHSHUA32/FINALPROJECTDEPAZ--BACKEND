@@ -1,21 +1,23 @@
 // migrate.js — Run this once to create all database tables
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const mysql = require('mysql2/promise');
 
 async function migrate() {
+    // Connect directly to the target database (Railway already creates it)
     const connection = await mysql.createConnection({
         host: process.env.DB_HOST,
-        port: process.env.DB_PORT,
+        port: parseInt(process.env.DB_PORT || '3306'),
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        multipleStatements: true,
     });
 
-    console.log('Connected to MySQL. Running migrations...');
+    console.log(`Connected to MySQL at ${process.env.DB_HOST}. Running migrations...`);
 
-    await connection.execute(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME}\``);
-    await connection.execute(`USE \`${process.env.DB_NAME}\``);
-
-    await connection.execute(`
+    // Use query() instead of execute() for DDL statements (Railway compatibility)
+    await connection.query(`
         CREATE TABLE IF NOT EXISTS accounts (
             id           INT AUTO_INCREMENT PRIMARY KEY,
             title        VARCHAR(10),
@@ -34,7 +36,7 @@ async function migrate() {
         )
     `);
 
-    await connection.execute(`
+    await connection.query(`
         CREATE TABLE IF NOT EXISTS refresh_tokens (
             id          INT AUTO_INCREMENT PRIMARY KEY,
             accountId   INT NOT NULL,
