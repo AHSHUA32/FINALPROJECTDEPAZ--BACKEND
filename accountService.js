@@ -130,7 +130,12 @@ async function register(params, origin) {
     // Check for duplicate email (send silent email instead of error for security)
     const existing = await getAccountByEmail(params.email);
     if (existing) {
-        await sendAlreadyRegisteredEmail(params.email, origin);
+        // Try to send duplicate-email notification, but don't crash if email fails
+        try {
+            await sendAlreadyRegisteredEmail(params.email, origin);
+        } catch (emailErr) {
+            console.error('[register] Failed to send already-registered email:', emailErr.message);
+        }
         return; // Don't reveal that the email exists
     }
 
@@ -142,13 +147,20 @@ async function register(params, origin) {
 
     const { title, firstName, lastName, email } = params;
 
+    // Save the account to the database FIRST
     await db.execute(
         `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, verificationToken)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [title, firstName, lastName, email, passwordHash, role, verificationToken]
     );
 
-    await sendVerificationEmail(email, verificationToken, origin);
+    // Send verification email — if this fails, account is still saved (email is non-critical)
+    try {
+        await sendVerificationEmail(email, verificationToken, origin);
+    } catch (emailErr) {
+        console.error('[register] Account saved but verification email failed to send:', emailErr.message);
+        // Account is still created; user will need to request a new verification email
+    }
 }
 
 async function verifyEmail({ token }) {
@@ -178,7 +190,12 @@ async function forgotPassword({ email }, origin) {
         [resetToken, resetTokenExpires, account.id]
     );
 
-    await sendPasswordResetEmail(account.email, resetToken, origin);
+    // Send reset email — if this fails, the token is still saved so admin can retrieve it
+    try {
+        await sendPasswordResetEmail(account.email, resetToken, origin);
+    } catch (emailErr) {
+        console.error('[forgotPassword] Reset token saved but email failed to send:', emailErr.message);
+    }
 }
 
 async function validateResetToken({ token }) {
