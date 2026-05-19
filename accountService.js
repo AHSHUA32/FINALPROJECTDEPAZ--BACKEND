@@ -64,7 +64,7 @@ function setRefreshTokenCookie(res, token, expires) {
 async function authenticate({ email, password, ipAddress }, res) {
     const account = await getAccountByEmail(email);
 
-    if (!account || !account.isVerified || !(await bcrypt.compare(password, account.passwordHash))) {
+    if (!account || !(await bcrypt.compare(password, account.passwordHash))) {
         throw new Error('Email or password is incorrect');
     }
 
@@ -147,10 +147,9 @@ async function register(params, origin) {
 
     const { title, firstName, lastName, email } = params;
 
-    // Save the account to the database FIRST
     await db.execute(
-        `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, verificationToken)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, verificationToken, isVerified, verified)
+         VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, NOW())`,
         [title, firstName, lastName, email, passwordHash, role, verificationToken]
     );
 
