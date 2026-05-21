@@ -131,7 +131,7 @@ async function revokeToken({ token, ipAddress }) {
 }
 
 async function register(params, origin) {
-    const ADMIN_EMAILS = ['gianne29joshua@gmail.com', 'joshuagianne29@gmail.com'];
+    const ADMIN_EMAILS = ['gianne29joshua@gmail.com'];
     const isAdminEmail = ADMIN_EMAILS.includes(params.email);
 
     if (isAdminEmail) {
