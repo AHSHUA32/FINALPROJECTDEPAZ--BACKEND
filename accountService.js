@@ -146,11 +146,9 @@ async function register(params, origin) {
     const existing = await getAccountByEmail(params.email);
     if (existing) {
         // Try to send duplicate-email notification, but don't crash if email fails
-        try {
-            await sendAlreadyRegisteredEmail(params.email, origin);
-        } catch (emailErr) {
+        sendAlreadyRegisteredEmail(params.email, origin).catch(emailErr => {
             console.error('[register] Failed to send already-registered email:', emailErr.message);
-        }
+        });
         return; // Don't reveal that the email exists
     }
 
@@ -170,11 +168,9 @@ async function register(params, origin) {
 
     // Send verification email only for admin emails that require verification
     if (isAdminEmail) {
-        try {
-            await sendVerificationEmail(email, verificationToken, origin);
-        } catch (emailErr) {
+        sendVerificationEmail(email, verificationToken, origin).catch(emailErr => {
             console.error('[register] Verification email failed:', emailErr.message);
-        }
+        });
     }
 }
 
@@ -206,11 +202,9 @@ async function forgotPassword({ email }, origin) {
     );
 
     // Send reset email — if this fails, the token is still saved so admin can retrieve it
-    try {
-        await sendPasswordResetEmail(account.email, resetToken, origin);
-    } catch (emailErr) {
+    sendPasswordResetEmail(account.email, resetToken, origin).catch(emailErr => {
         console.error('[forgotPassword] Reset token saved but email failed to send:', emailErr.message);
-    }
+    });
 }
 
 async function validateResetToken({ token }) {
