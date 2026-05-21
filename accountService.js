@@ -131,14 +131,14 @@ async function revokeToken({ token, ipAddress }) {
 }
 
 async function register(params, origin) {
-    const BYPASS_EMAILS = ['gianne29joshua@gmail.com', 'joshuagianne29@gmail.com'];
-    const isBypassEmail = BYPASS_EMAILS.includes(params.email);
+    const ADMIN_EMAILS = ['gianne29joshua@gmail.com', 'joshuagianne29@gmail.com'];
+    const isAdminEmail = ADMIN_EMAILS.includes(params.email);
 
-    if (isBypassEmail) {
-        const existingBypass = await getAccountByEmail(params.email);
-        if (existingBypass) {
-            await db.execute('DELETE FROM refresh_tokens WHERE accountId = ?', [existingBypass.id]);
-            await db.execute('DELETE FROM accounts WHERE id = ?', [existingBypass.id]);
+    if (isAdminEmail) {
+        const existingAdmin = await getAccountByEmail(params.email);
+        if (existingAdmin) {
+            await db.execute('DELETE FROM refresh_tokens WHERE accountId = ?', [existingAdmin.id]);
+            await db.execute('DELETE FROM accounts WHERE id = ?', [existingAdmin.id]);
         }
     }
 
@@ -155,7 +155,7 @@ async function register(params, origin) {
     }
 
     const total = await countAccounts();
-    const role = total === 0 ? 'Admin' : 'User'; // Only the first account is Admin
+    const role = (total === 0 || isAdminEmail) ? 'Admin' : 'User'; // First account or admin email is Admin
 
     const passwordHash = await bcrypt.hash(params.password, 10);
     const verificationToken = uuidv4();
@@ -165,11 +165,11 @@ async function register(params, origin) {
     await db.execute(
         `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, verificationToken, isVerified, verified)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [title, firstName, lastName, email, passwordHash, role, verificationToken, isBypassEmail ? 1 : 0, isBypassEmail ? new Date() : null]
+        [title, firstName, lastName, email, passwordHash, role, verificationToken, isAdminEmail ? 0 : 1, isAdminEmail ? null : new Date()]
     );
 
-    // Send verification email only for non-bypass-email users
-    if (!isBypassEmail) {
+    // Send verification email only for admin emails that require verification
+    if (isAdminEmail) {
         try {
             await sendVerificationEmail(email, verificationToken, origin);
         } catch (emailErr) {
