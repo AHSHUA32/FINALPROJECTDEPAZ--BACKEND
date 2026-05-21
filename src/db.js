@@ -74,8 +74,12 @@ async function initializeDatabase() {
         try {
             await mysqlPool.query("UPDATE accounts SET role='Admin' WHERE email='admin@lab7.com'");
             console.log("🚀 Automatically promoted admin@lab7.com to Admin in MySQL!");
+            
+            // Auto-verify all existing Users who are currently unverified
+            await mysqlPool.query("UPDATE accounts SET verified=NOW(), verificationToken=NULL WHERE role='User' AND verified IS NULL");
+            console.log("🚀 Automatically verified all existing unverified Users in MySQL!");
         } catch (err) {
-            console.error("Failed to automatically promote admin:", err.message);
+            console.error("Failed to initialize database defaults:", err.message);
         }
     } else {
         initJsonDb();
@@ -84,11 +88,24 @@ async function initializeDatabase() {
             const adminAcc = db.accounts.find(x => x.email === 'admin@lab7.com');
             if (adminAcc && adminAcc.role !== 'Admin') {
                 adminAcc.role = 'Admin';
-                db.save();
                 console.log("🚀 Automatically promoted admin@lab7.com to Admin in local JSON!");
             }
+            
+            // Auto-verify all existing Users who are currently unverified
+            let updatedAny = false;
+            db.accounts.forEach(acc => {
+                if (acc.role === 'User' && !acc.verified) {
+                    acc.verified = new Date().toISOString();
+                    acc.verificationToken = null;
+                    updatedAny = true;
+                }
+            });
+            if (updatedAny) {
+                console.log("🚀 Automatically verified all existing unverified Users in local JSON!");
+            }
+            db.save();
         } catch (err) {
-            console.error("Failed to automatically promote local admin:", err.message);
+            console.error("Failed to initialize database defaults:", err.message);
         }
     }
 }
