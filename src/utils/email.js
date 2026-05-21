@@ -144,7 +144,7 @@ async function sendEmail({ to, subject, html }) {
                 from: process.env.EMAIL_FROM || '"Lab7 Auth" <noreply@lab7.com>',
                 to, subject, html,
             }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 8000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 30000))
         ]);
 
         const previewUrl = nodemailer.getTestMessageUrl(info);
