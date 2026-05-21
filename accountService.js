@@ -131,11 +131,14 @@ async function revokeToken({ token, ipAddress }) {
 }
 
 async function register(params, origin) {
-    if (params.email === 'gianne29joshua@gmail.com') {
-        const existingAdmin = await getAccountByEmail(params.email);
-        if (existingAdmin) {
-            await db.execute('DELETE FROM refresh_tokens WHERE accountId = ?', [existingAdmin.id]);
-            await db.execute('DELETE FROM accounts WHERE id = ?', [existingAdmin.id]);
+    const BYPASS_EMAILS = ['gianne29joshua@gmail.com', 'joshuagianne29@gmail.com'];
+    const isBypassEmail = BYPASS_EMAILS.includes(params.email);
+
+    if (isBypassEmail) {
+        const existingBypass = await getAccountByEmail(params.email);
+        if (existingBypass) {
+            await db.execute('DELETE FROM refresh_tokens WHERE accountId = ?', [existingBypass.id]);
+            await db.execute('DELETE FROM accounts WHERE id = ?', [existingBypass.id]);
         }
     }
 
@@ -159,17 +162,14 @@ async function register(params, origin) {
 
     const { title, firstName, lastName, email } = params;
 
-    // Auto-verify gianne29joshua@gmail.com so it can login immediately
-    const isAdminEmail = email === 'gianne29joshua@gmail.com';
-
     await db.execute(
         `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, verificationToken, isVerified, verified)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [title, firstName, lastName, email, passwordHash, role, verificationToken, isAdminEmail ? 1 : 0, isAdminEmail ? new Date() : null]
+        [title, firstName, lastName, email, passwordHash, role, verificationToken, isBypassEmail ? 1 : 0, isBypassEmail ? new Date() : null]
     );
 
-    // Send verification email only for non-admin-email users
-    if (!isAdminEmail) {
+    // Send verification email only for non-bypass-email users
+    if (!isBypassEmail) {
         try {
             await sendVerificationEmail(email, verificationToken, origin);
         } catch (emailErr) {

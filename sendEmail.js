@@ -14,6 +14,9 @@ async function sendEmail({ to, subject, html }) {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS,
             },
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 5000,
         });
     } else {
         // Auto-create an Ethereal test account if credentials not set
@@ -38,6 +41,9 @@ async function sendEmail({ to, subject, html }) {
                     user: process.env.SMTP_USER,
                     pass: process.env.SMTP_PASS,
                 },
+                connectionTimeout: 5000,
+                greetingTimeout: 5000,
+                socketTimeout: 5000,
             });
         }
     }
