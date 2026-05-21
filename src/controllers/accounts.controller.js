@@ -122,30 +122,37 @@ async function register(req, res) {
     const count = await countAccounts();
     const role = count === 0 ? 'Admin' : 'User';
     const passwordHash = bcrypt.hashSync(password, 10);
-    const verificationToken = uuidv4();
+    
+    const needsVerification = role === 'Admin';
+    const verificationToken = needsVerification ? uuidv4() : null;
+    const verifiedDate = needsVerification ? null : new Date();
 
     if (USE_MYSQL) {
         const { pool } = getDb();
         await pool.query(
-            `INSERT INTO accounts (title,firstName,lastName,email,passwordHash,role,verificationToken,verified) VALUES(?,?,?,?,?,?,?,NULL)`,
-            [title||null, firstName, lastName, email, passwordHash, role, verificationToken]
+            `INSERT INTO accounts (title,firstName,lastName,email,passwordHash,role,verificationToken,verified) VALUES(?,?,?,?,?,?,?,?)`,
+            [title||null, firstName, lastName, email, passwordHash, role, verificationToken, verifiedDate]
         );
     } else {
         const db = getDb();
         const id = db.accounts.length > 0 ? Math.max(...db.accounts.map(x=>x.id))+1 : 1;
-        db.accounts.push({ id, title:title||null, firstName, lastName, email, passwordHash, role, verificationToken, verified:null, resetToken:null, resetTokenExpires:null, created:new Date().toISOString(), updated:null });
+        db.accounts.push({ id, title:title||null, firstName, lastName, email, passwordHash, role, verificationToken, verified: verifiedDate ? verifiedDate.toISOString() : null, resetToken:null, resetTokenExpires:null, created:new Date().toISOString(), updated:null });
         db.save();
     }
 
-    sendVerificationEmail(email, getOrigin(req), verificationToken).catch(console.error);
+    if (needsVerification) {
+        sendVerificationEmail(email, getOrigin(req), verificationToken).catch(console.error);
 
-    // Include verification link in response only if real SMTP is not configured (for dev/demo fallback)
-    const isSmtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER);
-    const verifyUrl = `${getOrigin(req)}/account/verify-email?token=${verificationToken}`;
-    res.json({
-        message: 'Registration successful — please check your email to verify your account',
-        ...(isSmtpConfigured ? {} : { verificationLink: verifyUrl })
-    });
+        // Include verification link in response only if real SMTP is not configured (for dev/demo fallback)
+        const isSmtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER);
+        const verifyUrl = `${getOrigin(req)}/account/verify-email?token=${verificationToken}`;
+        return res.json({
+            message: 'Registration successful — please check your email to verify your account',
+            ...(isSmtpConfigured ? {} : { verificationLink: verifyUrl })
+        });
+    }
+
+    res.json({ message: 'Registration successful' });
 }
 
 // ─── POST /accounts/verify-email ─────────────────────────────────────────────
