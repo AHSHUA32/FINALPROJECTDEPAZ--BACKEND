@@ -12,6 +12,7 @@ async function migrate() {
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
         multipleStatements: true,
+        ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
     });
 
     console.log(`Connected to MySQL at ${process.env.DB_HOST}. Running migrations...`);
