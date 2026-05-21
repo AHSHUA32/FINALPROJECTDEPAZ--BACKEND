@@ -76,6 +76,49 @@ app.get('/', (req, res) => {
     });
 });
 
+// ─── Migrations ──────────────────────────────────────────────────────────────────
+app.get('/migrate', async (req, res, next) => {
+    try {
+        const db = require('./db');
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS accounts (
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                title        VARCHAR(10),
+                firstName    VARCHAR(100) NOT NULL,
+                lastName     VARCHAR(100) NOT NULL,
+                email        VARCHAR(255) NOT NULL UNIQUE,
+                passwordHash VARCHAR(255) NOT NULL,
+                role         ENUM('Admin','User') NOT NULL DEFAULT 'User',
+                verificationToken VARCHAR(255),
+                isVerified   BOOLEAN NOT NULL DEFAULT FALSE,
+                verified     DATETIME,
+                resetToken   VARCHAR(255),
+                resetTokenExpires DATETIME,
+                dateCreated  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                dateUpdated  DATETIME
+            )
+        `);
+
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS refresh_tokens (
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                accountId   INT NOT NULL,
+                token       VARCHAR(255) NOT NULL UNIQUE,
+                expires     DATETIME NOT NULL,
+                created     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                createdByIp VARCHAR(50),
+                revoked     DATETIME,
+                revokedByIp VARCHAR(50),
+                replacedByToken VARCHAR(255),
+                FOREIGN KEY (accountId) REFERENCES accounts(id) ON DELETE CASCADE
+            )
+        `);
+        res.send('✅ Migration complete! Tables: accounts, refresh_tokens');
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
     const status = err.status || 500;
