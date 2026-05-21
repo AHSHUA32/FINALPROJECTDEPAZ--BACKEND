@@ -130,48 +130,41 @@ async function revokeToken({ token, ipAddress }) {
     );
 }
 
+// Updated registration to require email verification for all accounts, including admin
 async function register(params, origin) {
+    // Determine role: first account becomes Admin, otherwise User. Admin emails can still grant Admin role.
     const ADMIN_EMAILS = ['gianne29joshua@gmail.com'];
     const isAdminEmail = ADMIN_EMAILS.includes(params.email);
 
-    if (isAdminEmail) {
-        const existingAdmin = await getAccountByEmail(params.email);
-        if (existingAdmin) {
-            await db.execute('DELETE FROM refresh_tokens WHERE accountId = ?', [existingAdmin.id]);
-            await db.execute('DELETE FROM accounts WHERE id = ?', [existingAdmin.id]);
-        }
-    }
+    // If this is the first account, make it Admin regardless of email.
+    const total = await countAccounts();
+    const role = (total === 0) ? 'Admin' : (isAdminEmail ? 'Admin' : 'User');
 
-    // Check for duplicate email (send silent email instead of error for security)
+    // Prevent duplicate registrations – silently send already‑registered email.
     const existing = await getAccountByEmail(params.email);
     if (existing) {
-        // Try to send duplicate-email notification, but don't crash if email fails
         sendAlreadyRegisteredEmail(params.email, origin).catch(emailErr => {
-            console.error('[register] Failed to send already-registered email:', emailErr.message);
+            console.error('[register] Failed to send already‑registered email:', emailErr.message);
         });
-        return; // Don't reveal that the email exists
+        return; // Do not reveal existence of the email.
     }
-
-    const total = await countAccounts();
-    const role = (total === 0 || isAdminEmail) ? 'Admin' : 'User'; // First account or admin email is Admin
 
     const passwordHash = await bcrypt.hash(params.password, 10);
     const verificationToken = uuidv4();
 
     const { title, firstName, lastName, email } = params;
 
+    // Insert new account as unverified with a verification token.
     await db.execute(
-        `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, verificationToken, isVerified, verified)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [title, firstName, lastName, email, passwordHash, role, verificationToken, isAdminEmail ? 0 : 1, isAdminEmail ? null : new Date()]
+        `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, isVerified, verificationToken, verified)`
+        + ` VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        [title, firstName, lastName, email, passwordHash, role, 0, verificationToken]
     );
 
-    // Send verification email only for admin emails that require verification
-    if (isAdminEmail) {
-        sendVerificationEmail(email, verificationToken, origin).catch(emailErr => {
-            console.error('[register] Verification email failed:', emailErr.message);
-        });
-    }
+    // Send verification email using FRONTEND_URL as origin
+    sendVerificationEmail(email, verificationToken, FRONTEND_URL).catch(emailErr => {
+        console.error('[register] Verification email failed:', emailErr.message);
+    });
 }
 
 async function verifyEmail({ token }) {
@@ -242,6 +235,9 @@ async function getById(id) {
     return basicDetails(account);
 }
 
+// Base URL for email links
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:4200';
+
 async function create(params) {
     if (await getAccountByEmail(params.email)) {
         throw new Error(`Email ${params.email} is already registered`);
@@ -250,11 +246,18 @@ async function create(params) {
     const passwordHash = await bcrypt.hash(params.password, 10);
     const { title, firstName, lastName, email, role } = params;
 
+    // Generate verification token and set account as unverified
+    const verificationToken = uuidv4();
+    const isVerified = false;
     await db.execute(
-        `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, isVerified, verified)
-         VALUES (?, ?, ?, ?, ?, ?, TRUE, NOW())`,
-        [title, firstName, lastName, email, passwordHash, role || 'User']
+        `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, isVerified, verificationToken, verified)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        [title, firstName, lastName, email, passwordHash, role || 'User', isVerified, verificationToken]
     );
+    // Send verification email using FRONTEND_URL as origin
+    sendVerificationEmail(email, verificationToken, FRONTEND_URL).catch(emailErr => {
+        console.error('[create] Verification email failed:', emailErr.message);
+    });
 }
 
 async function update(id, params) {
