@@ -1,138 +1,81 @@
-// server.js — Express app entry point
 require('dotenv').config();
 require('express-async-errors');
+
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
 
-const accountsRouter = require('./accountsRouter');
+const { initializeDatabase } = require('./src/db');
+const accountRoutes = require('./src/routes/accounts');
+const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
+const PORT = process.env.PORT || 4000;
 
-// ─── CORS ──────────────────────────────────────────────────────────────────────
-// Handle OPTIONS preflight requests for all routes
-app.options('*', cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
-    credentials: true,
-}));
-
+// ─── CORS ────────────────────────────────────────────────────────────────────
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
-    credentials: true, // Required for httpOnly refreshToken cookie
+    origin: function (origin, callback) {
+        callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ─── Middleware ────────────────────────────────────────────────────────────────
+// ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ─── Swagger Setup ─────────────────────────────────────────────────────────────
-// APP_URL env var is set on Render to the public backend URL
-const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 4000}`;
-
+// ─── Swagger ──────────────────────────────────────────────────────────────────
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'LAB7DEPAZ Auth API',
+            title: 'Lab7 Auth API',
             version: '1.0.0',
-            description: 'Node.js + MySQL JWT Authentication API — Final Project',
+            description: 'Full-Stack Authentication System API — JWT + Refresh Tokens + RBAC',
         },
         servers: [
-            {
-                url: appUrl,
-                description: process.env.NODE_ENV === 'production' ? 'Production' : 'Local Development',
-            },
+            { url: 'https://lab7-backend-6o88.onrender.com', description: 'Production (Render)' },
+            { url: 'http://localhost:4000', description: 'Local Development' }
         ],
         components: {
             securitySchemes: {
-                bearerAuth: {
-                    type: 'http',
-                    scheme: 'bearer',
-                    bearerFormat: 'JWT',
-                },
-            },
-        },
+                bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
+            }
+        }
     },
-    apis: ['./accountsRouter.js'],
+    apis: ['./src/routes/*.js'],
 };
-
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: 'LAB7DEPAZ API Docs',
-}));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// ─── Routes ────────────────────────────────────────────────────────────────────
-app.use('/accounts', accountsRouter);
+// ─── Routes ──────────────────────────────────────────────────────────────────
+app.use('/accounts', accountRoutes);
 
 // Health check
 app.get('/', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'LAB7DEPAZ Auth API is running',
-        docs: '/api-docs',
-    });
+    res.json({ status: 'ok', message: 'Lab7 Auth API is running', docs: `/api-docs` });
 });
 
-// ─── Migrations ──────────────────────────────────────────────────────────────────
-app.get('/migrate', async (req, res, next) => {
+// ─── Error Handler ───────────────────────────────────────────────────────────
+app.use(errorHandler);
+
+// ─── Start ───────────────────────────────────────────────────────────────────
+function start() {
     try {
-        const db = require('./db');
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS accounts (
-                id           INT AUTO_INCREMENT PRIMARY KEY,
-                title        VARCHAR(10),
-                firstName    VARCHAR(100) NOT NULL,
-                lastName     VARCHAR(100) NOT NULL,
-                email        VARCHAR(255) NOT NULL UNIQUE,
-                passwordHash VARCHAR(255) NOT NULL,
-                role         ENUM('Admin','User') NOT NULL DEFAULT 'User',
-                verificationToken VARCHAR(255),
-                isVerified   BOOLEAN NOT NULL DEFAULT FALSE,
-                verified     DATETIME,
-                resetToken   VARCHAR(255),
-                resetTokenExpires DATETIME,
-                dateCreated  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                dateUpdated  DATETIME
-            )
-        `);
-
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS refresh_tokens (
-                id          INT AUTO_INCREMENT PRIMARY KEY,
-                accountId   INT NOT NULL,
-                token       VARCHAR(255) NOT NULL UNIQUE,
-                expires     DATETIME NOT NULL,
-                created     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                createdByIp VARCHAR(50),
-                revoked     DATETIME,
-                revokedByIp VARCHAR(50),
-                replacedByToken VARCHAR(255),
-                FOREIGN KEY (accountId) REFERENCES accounts(id) ON DELETE CASCADE
-            )
-        `);
-        res.send('✅ Migration complete! Tables: accounts, refresh_tokens');
+        initializeDatabase();
+        app.listen(PORT, () => {
+            console.log(`\n✅ Lab7 API running at http://localhost:${PORT}`);
+            console.log(`📚 Swagger docs at  http://localhost:${PORT}/api-docs\n`);
+        });
     } catch (err) {
-        next(err);
+        console.error('❌ Failed to start server:', err.message);
+        process.exit(1);
     }
-});
+}
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-    const status = err.status || 500;
-    const message = err.message || 'Internal Server Error';
-
-    console.error(`[ERROR] ${status}: ${message}`);
-    if (err.stack) console.error(err.stack);
-
-    res.status(status).json({ message });
-});
-
-// ─── Start Server ─────────────────────────────────────────────────────────────
-const PORT = parseInt(process.env.PORT || '4000');
-app.listen(PORT, () => {
-    console.log(`\n🚀 LAB7DEPAZ API running on http://localhost:${PORT}`);
-    console.log(`📖 Swagger docs at http://localhost:${PORT}/api-docs\n`);
-});
+start();
