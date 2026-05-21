@@ -68,9 +68,8 @@ async function authenticate({ email, password, ipAddress }, res) {
         throw new Error('Email or password is incorrect');
     }
 
-    if (account.email === 'gianne29joshua@gmail.com' && account.role !== 'Admin') {
-        await db.execute('UPDATE accounts SET role = ? WHERE id = ?', ['Admin', account.id]);
-        account.role = 'Admin';
+    if (!account.isVerified) {
+        throw new Error('Email not verified. Please check your email for verification instructions.');
     }
 
     const jwtToken = generateJwtToken(account);
@@ -153,28 +152,29 @@ async function register(params, origin) {
     }
 
     const total = await countAccounts();
-    let role = total === 0 ? 'Admin' : 'User'; // First account is Admin
-    if (params.email === 'gianne29joshua@gmail.com') {
-        role = 'Admin';
-    }
+    const role = total === 0 ? 'Admin' : 'User'; // Only the first account is Admin
 
     const passwordHash = await bcrypt.hash(params.password, 10);
     const verificationToken = uuidv4();
 
     const { title, firstName, lastName, email } = params;
 
+    // Auto-verify gianne29joshua@gmail.com so it can login immediately
+    const isAdminEmail = email === 'gianne29joshua@gmail.com';
+
     await db.execute(
         `INSERT INTO accounts (title, firstName, lastName, email, passwordHash, role, verificationToken, isVerified, verified)
-         VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, NOW())`,
-        [title, firstName, lastName, email, passwordHash, role, verificationToken]
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [title, firstName, lastName, email, passwordHash, role, verificationToken, isAdminEmail ? 1 : 0, isAdminEmail ? new Date() : null]
     );
 
-    // Send verification email — if this fails, account is still saved (email is non-critical)
-    try {
-        await sendVerificationEmail(email, verificationToken, origin);
-    } catch (emailErr) {
-        console.error('[register] Account saved but verification email failed to send:', emailErr.message);
-        // Account is still created; user will need to request a new verification email
+    // Send verification email only for non-admin-email users
+    if (!isAdminEmail) {
+        try {
+            await sendVerificationEmail(email, verificationToken, origin);
+        } catch (emailErr) {
+            console.error('[register] Verification email failed:', emailErr.message);
+        }
     }
 }
 
