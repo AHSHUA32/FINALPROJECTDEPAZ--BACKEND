@@ -38,7 +38,7 @@ function basicDetails(a) {
 async function findAccountByEmail(email) {
     if (USE_MYSQL) {
         const { pool } = getDb();
-        const [r] = await pool.query('SELECT * FROM accounts WHERE email=?', [email]);
+        const [r] = await pool.query('SELECT * FROM depaz_accounts WHERE email=?', [email]);
         return r[0];
     }
     return getDb().accounts.find(x => x.email === email);
@@ -47,7 +47,7 @@ async function findAccountByEmail(email) {
 async function findAccountById(id) {
     if (USE_MYSQL) {
         const { pool } = getDb();
-        const [r] = await pool.query('SELECT * FROM accounts WHERE id=?', [id]);
+        const [r] = await pool.query('SELECT * FROM depaz_accounts WHERE id=?', [id]);
         return r[0];
     }
     return getDb().accounts.find(x => x.id === id);
@@ -56,7 +56,7 @@ async function findAccountById(id) {
 async function countAccounts() {
     if (USE_MYSQL) {
         const { pool } = getDb();
-        const [r] = await pool.query('SELECT COUNT(*) as count FROM accounts');
+        const [r] = await pool.query('SELECT COUNT(*) as count FROM depaz_accounts');
         return parseInt(r[0].count);
     }
     return getDb().accounts.length;
@@ -130,7 +130,7 @@ async function register(req, res) {
     if (USE_MYSQL) {
         const { pool } = getDb();
         await pool.query(
-            `INSERT INTO accounts (title,firstName,lastName,email,passwordHash,role,verificationToken,verified) VALUES(?,?,?,?,?,?,?,?)`,
+            `INSERT INTO depaz_accounts (title,firstName,lastName,email,passwordHash,role,verificationToken,verified) VALUES(?,?,?,?,?,?,?,?)`,
             [title||null, firstName, lastName, email, passwordHash, role, verificationToken, verifiedDate]
         );
     } else {
@@ -162,9 +162,9 @@ async function verifyEmail(req, res) {
 
     if (USE_MYSQL) {
         const { pool } = getDb();
-        const [r] = await pool.query('SELECT * FROM accounts WHERE verificationToken=?', [token]);
+        const [r] = await pool.query('SELECT * FROM depaz_accounts WHERE verificationToken=?', [token]);
         if (!r[0]) return res.status(400).json({ message: 'Verification failed' });
-        await pool.query('UPDATE accounts SET verified=NOW(),verificationToken=NULL WHERE id=?', [r[0].id]);
+        await pool.query('UPDATE depaz_accounts SET verified=NOW(),verificationToken=NULL WHERE id=?', [r[0].id]);
     } else {
         const db = getDb();
         const account = db.accounts.find(x => x.verificationToken === token);
@@ -186,7 +186,7 @@ async function forgotPassword(req, res) {
         // Fallback for demo: if email not found, just use the first account in the db
         if (USE_MYSQL) {
             const { pool } = getDb();
-            const [all] = await pool.query('SELECT * FROM accounts LIMIT 1');
+            const [all] = await pool.query('SELECT * FROM depaz_accounts LIMIT 1');
             account = all[0];
         } else {
             const db = getDb();
@@ -201,7 +201,7 @@ async function forgotPassword(req, res) {
 
     if (USE_MYSQL) {
         const { pool } = getDb();
-        await pool.query('UPDATE accounts SET resetToken=?,resetTokenExpires=? WHERE id=?', [resetToken, resetExpires, account.id]);
+        await pool.query('UPDATE depaz_accounts SET resetToken=?,resetTokenExpires=? WHERE id=?', [resetToken, resetExpires, account.id]);
     } else {
         const db = getDb();
         const acc = db.accounts.find(x => x.email === email);
@@ -226,7 +226,7 @@ async function validateResetToken(req, res) {
     let found;
     if (USE_MYSQL) {
         const { pool } = getDb();
-        const [r] = await pool.query('SELECT id FROM accounts WHERE resetToken=?', [token]);
+        const [r] = await pool.query('SELECT id FROM depaz_accounts WHERE resetToken=?', [token]);
         found = r[0];
     } else {
         found = getDb().accounts.find(x => x.resetToken===token);
@@ -244,18 +244,18 @@ async function resetPassword(req, res) {
     const hash = bcrypt.hashSync(password, 10);
     if (USE_MYSQL) {
         const { pool } = getDb();
-        const [r] = await pool.query('SELECT id FROM accounts WHERE resetToken=?', [token]);
+        const [r] = await pool.query('SELECT id FROM depaz_accounts WHERE resetToken=?', [token]);
         let accountId = null;
         if (r[0]) {
             accountId = r[0].id;
         } else {
             // Fallback for demo: if token not found (e.g., db restart), update the first account
-            const [all] = await pool.query('SELECT id FROM accounts LIMIT 1');
+            const [all] = await pool.query('SELECT id FROM depaz_accounts LIMIT 1');
             if (all[0]) accountId = all[0].id;
         }
         
         if (!accountId) return res.status(400).json({ message: 'No accounts in database to reset' });
-        await pool.query(`UPDATE accounts SET passwordHash=?,verified=COALESCE(verified,NOW()),resetToken=NULL,resetTokenExpires=NULL,passwordReset=NOW() WHERE id=?`, [hash, accountId]);
+        await pool.query(`UPDATE depaz_accounts SET passwordHash=?,verified=COALESCE(verified,NOW()),resetToken=NULL,resetTokenExpires=NULL,passwordReset=NOW() WHERE id=?`, [hash, accountId]);
     } else {
         const db = getDb();
         let acc = db.accounts.find(x => x.resetToken===token);
@@ -273,7 +273,7 @@ async function resetPassword(req, res) {
 async function getAll(req, res) {
     if (USE_MYSQL) {
         const { pool } = getDb();
-        const [r] = await pool.query('SELECT * FROM accounts');
+        const [r] = await pool.query('SELECT * FROM depaz_accounts');
         return res.json(r.map(basicDetails));
     }
     res.json(getDb().accounts.map(basicDetails));
@@ -300,7 +300,7 @@ async function create(req, res) {
     const hash = bcrypt.hashSync(password, 10);
     if (USE_MYSQL) {
         const { pool } = getDb();
-        await pool.query(`INSERT INTO accounts (title,firstName,lastName,email,passwordHash,role,verified) VALUES(?,?,?,?,?,?,NOW())`, [title||null,firstName,lastName,email,hash,role]);
+        await pool.query(`INSERT INTO depaz_accounts (title,firstName,lastName,email,passwordHash,role,verified) VALUES(?,?,?,?,?,?,NOW())`, [title||null,firstName,lastName,email,hash,role]);
     } else {
         const db = getDb();
         const id = db.accounts.length > 0 ? Math.max(...db.accounts.map(x=>x.id))+1 : 1;
@@ -331,8 +331,8 @@ async function update(req, res) {
         if (password){sets.push(`passwordHash=?`);vals.push(bcrypt.hashSync(password,10));}
         if (role && req.user.role==='Admin'){sets.push(`role=?`);vals.push(role);}
         vals.push(id);
-        await pool.query(`UPDATE accounts SET ${sets.join(',')} WHERE id=?`, vals);
-        const [r] = await pool.query('SELECT * FROM accounts WHERE id=?',[id]);
+        await pool.query(`UPDATE depaz_accounts SET ${sets.join(',')} WHERE id=?`, vals);
+        const [r] = await pool.query('SELECT * FROM depaz_accounts WHERE id=?',[id]);
         return res.json(basicDetails(r[0]));
     } else {
         const db = getDb();
@@ -358,7 +358,7 @@ async function deleteAccount(req, res) {
 
     if (USE_MYSQL) {
         const { pool } = getDb();
-        await pool.query('DELETE FROM accounts WHERE id=?', [id]);
+        await pool.query('DELETE FROM depaz_accounts WHERE id=?', [id]);
     } else {
         const db = getDb();
         const idx = db.accounts.findIndex(x=>x.id===id);

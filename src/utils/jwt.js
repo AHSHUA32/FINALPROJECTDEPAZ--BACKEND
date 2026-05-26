@@ -39,7 +39,7 @@ async function generateRefreshTokenMysql(accountId, ipAddress) {
     const token = uuidv4();
     const expires = new Date(Date.now() + REFRESH_DAYS * 24 * 60 * 60 * 1000);
     await pool.query(
-        `INSERT INTO refresh_tokens (accountId,token,expires,createdByIp) VALUES(?,?,?,?)`,
+        `INSERT INTO depaz_refresh_tokens (accountId,token,expires,createdByIp) VALUES(?,?,?,?)`,
         [accountId, token, expires, ipAddress]
     );
     return token;
@@ -47,7 +47,7 @@ async function generateRefreshTokenMysql(accountId, ipAddress) {
 
 async function getRefreshTokenMysql(token) {
     const { pool } = getDb();
-    const [r] = await pool.query('SELECT * FROM refresh_tokens WHERE token=?', [token]);
+    const [r] = await pool.query('SELECT * FROM depaz_refresh_tokens WHERE token=?', [token]);
     const rt = r[0];
     if (!rt || new Date() > new Date(rt.expires) || rt.revoked) throw new Error('Invalid token');
     return rt;
@@ -56,7 +56,7 @@ async function getRefreshTokenMysql(token) {
 async function revokeTokenMysql(token, ipAddress, replacedByToken = null) {
     const { pool } = getDb();
     await pool.query(
-        `UPDATE refresh_tokens SET revoked=NOW(),revokedByIp=?,replacedByToken=? WHERE token=?`,
+        `UPDATE depaz_refresh_tokens SET revoked=NOW(),revokedByIp=?,replacedByToken=? WHERE token=?`,
         [ipAddress, replacedByToken, token]
     );
 }

@@ -31,7 +31,7 @@ async function initMysqlDb() {
     mysqlPool = mysql.createPool(process.env.DATABASE_URL);
 
     await mysqlPool.query(`
-        CREATE TABLE IF NOT EXISTS accounts (
+        CREATE TABLE IF NOT EXISTS depaz_accounts (
             id INT AUTO_INCREMENT PRIMARY KEY,
             title VARCHAR(10),
             firstName VARCHAR(100) NOT NULL,
@@ -49,7 +49,7 @@ async function initMysqlDb() {
         )
     `);
     await mysqlPool.query(`
-        CREATE TABLE IF NOT EXISTS refresh_tokens (
+        CREATE TABLE IF NOT EXISTS depaz_refresh_tokens (
             id INT AUTO_INCREMENT PRIMARY KEY,
             accountId INT NOT NULL,
             token VARCHAR(255) NOT NULL UNIQUE,
@@ -59,7 +59,7 @@ async function initMysqlDb() {
             revoked DATETIME,
             revokedByIp VARCHAR(45),
             replacedByToken VARCHAR(255),
-            FOREIGN KEY (accountId) REFERENCES accounts(id) ON DELETE CASCADE
+            FOREIGN KEY (accountId) REFERENCES depaz_accounts(id) ON DELETE CASCADE
         )
     `);
     console.log('✅ MySQL database ready');
@@ -72,11 +72,11 @@ async function initializeDatabase() {
     if (USE_MYSQL) {
         await initMysqlDb();
         try {
-            await mysqlPool.query("UPDATE accounts SET role='Admin' WHERE email='admin@lab7.com'");
+            await mysqlPool.query("UPDATE depaz_accounts SET role='Admin' WHERE email='admin@lab7.com'");
             console.log("🚀 Automatically promoted admin@lab7.com to Admin in MySQL!");
             
             // Auto-verify all existing Users who are currently unverified
-            await mysqlPool.query("UPDATE accounts SET verified=NOW(), verificationToken=NULL WHERE role='User' AND verified IS NULL");
+            await mysqlPool.query("UPDATE depaz_accounts SET verified=NOW(), verificationToken=NULL WHERE role='User' AND verified IS NULL");
             console.log("🚀 Automatically verified all existing unverified Users in MySQL!");
         } catch (err) {
             console.error("Failed to initialize database defaults:", err.message);

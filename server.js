@@ -68,10 +68,16 @@ app.use(errorHandler);
 function start() {
     try {
         initializeDatabase();
-        app.listen(PORT, () => {
-            console.log(`\n✅ Lab7 API running at http://localhost:${PORT}`);
-            console.log(`📚 Swagger docs at  http://localhost:${PORT}/api-docs\n`);
-        });
+        
+        // Vercel serverless functions do not need app.listen()
+        if (!process.env.VERCEL) {
+            app.listen(PORT, () => {
+                console.log(`\n✅ Lab7 API running at http://localhost:${PORT}`);
+                console.log(`📚 Swagger docs at  http://localhost:${PORT}/api-docs\n`);
+            });
+        } else {
+            console.log('🚀 Serverless function loaded: database initialization triggered');
+        }
     } catch (err) {
         console.error('❌ Failed to start server:', err.message);
         process.exit(1);
@@ -79,3 +85,5 @@ function start() {
 }
 
 start();
+
+module.exports = app;

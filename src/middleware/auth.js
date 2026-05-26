@@ -12,7 +12,7 @@ async function authenticate(req, res, next) {
         let account;
         if (USE_MYSQL) {
             const { pool } = getDb();
-            const [r] = await pool.query('SELECT * FROM accounts WHERE id=?', [decoded.id]);
+            const [r] = await pool.query('SELECT * FROM depaz_accounts WHERE id=?', [decoded.id]);
             account = r[0];
         } else {
             account = getDb().accounts.find(x => x.id === decoded.id);
