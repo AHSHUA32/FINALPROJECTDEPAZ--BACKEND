@@ -1,0 +1,14 @@
+FULL NAME: Joshua Gianne E. De Paz
+EDP CODE: [Enter Your EDP Code Here]
+SCHEDULE: [Enter Your Class Schedule Here]
+
+GITHUB DETAILS:
+
+GitHub Account: https://github.com/AHSHUA32
+Frontend Repository: https://github.com/AHSHUA32/FINALPROJECTDEPAZ--FRONTEND.git
+Backend Repository: https://github.com/AHSHUA32/FINALPROJECTDEPAZ--BACKEND.git
+
+DEPLOYMENT LINKS:
+
+Frontend Hosting: https://finalprojectdepaz-frontend.vercel.app
+Backend Hosting: https://finalprojectdepaz-backend.vercel.app/api-docs
